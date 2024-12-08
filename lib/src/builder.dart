@@ -58,7 +58,7 @@ class KeysBuilder implements Builder {
     final classes = _generateClasses(
       className: className,
       map: yamlMap,
-      scope: '$baseName.keys',
+      scope: baseName,
     );
 
     // Create a buffer for the generated Dart code.
