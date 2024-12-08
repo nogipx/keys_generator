@@ -15,6 +15,6 @@ builders:
   keys_generator:
     import: "package:keys_generator/src/builder.dart"
     builder_factories: ["keysBuilder"]
-    build_extensions: { ".yaml": [".g.dart"], ".yml": [".g.dart"] }
+    build_extensions: { ".yaml": [".dart"], ".yml": [".dart"] }
     auto_apply: dependents
     build_to: source
