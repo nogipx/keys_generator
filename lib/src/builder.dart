@@ -52,7 +52,11 @@ class KeysBuilder implements Builder {
     final className = '${_capitalize(_toCamelCase(baseName))}Keys';
 
     // Read and parse the YAML content into a YamlMap.
-    final yamlMap = loadYaml(await buildStep.readAsString(id)) as YamlMap;
+    final content = await buildStep.readAsString(id);
+    if (content.trim().isEmpty) {
+      return '';
+    }
+    final yamlMap = loadYaml(content) as YamlMap;
 
     // Generate a list of classes (the main class and any nested classes).
     final classes = _generateClasses(

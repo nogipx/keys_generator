@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3
+- fix: do not generate anything if yaml is empty
+
 ## 1.0.2
 - fix: remove redutant part `.keys.` in generated strings
 
