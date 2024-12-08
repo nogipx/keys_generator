@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:build/build.dart';
 import 'package:yaml/yaml.dart';
 
@@ -114,7 +115,7 @@ class KeysBuilder implements Builder {
 
         // Add a reference field to the nested class instance.
         fields.add('  /// {@macro $templateName}');
-        fields.add('  final $nestedClassName $camelKey = $nestedClassName._();');
+        fields.add('  $nestedClassName get $camelKey => const $nestedClassName._();');
 
         // Recursively generate the nested classes.
         nestedClasses.addAll(_generateClasses(
@@ -127,7 +128,7 @@ class KeysBuilder implements Builder {
       } else if (value is String) {
         // For strings, we create a string field that holds the generated key path.
         fields.add('  /// $value');
-        fields.add("  final $camelKey = '$variableValue';");
+        fields.add("  String get $camelKey => '$variableValue';");
       }
     });
 
@@ -142,7 +143,7 @@ class KeysBuilder implements Builder {
     // Define the class, starting with its constructor and static instance if top-level.
     mainBuffer
       ..writeln('class $className {')
-      ..writeln('  $className._();');
+      ..writeln('  const $className._();');
 
     // For the root class (no currentPath), add a static instance.
     if (currentPath.isEmpty) {
