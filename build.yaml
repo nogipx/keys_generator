@@ -1,0 +1,20 @@
+targets:
+  $default:
+    builders:
+      keys_generator|keysBuilder:
+        enabled: true
+        generate_for:
+          - "**/*.yaml"
+          - "**/*.yml"
+      source_gen|combining_builder:
+        options:
+          ignore_for_file:
+            - "type=lint"
+
+builders:
+  keys_generator:
+    import: "package:keys_generator/src/builder.dart"
+    builder_factories: ["keysBuilder"]
+    build_extensions: { ".yaml": [".g.dart"], ".yml": [".g.dart"] }
+    auto_apply: dependents
+    build_to: source
