@@ -1,0 +1,10 @@
+title:
+
+group:
+  list:
+    - required_date
+    - required_money
+
+map:
+  required_date:
+  required_money:
