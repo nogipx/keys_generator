@@ -42,9 +42,7 @@ Builder keysBuilder(BuilderOptions options) => KeysBuilder();
 ///   /// App Title
 ///   String get title => 'app.title';
 ///
-///   /// {@template app.messages}
 ///   /// Keys for messages displayed in the UI.
-///   /// {@endtemplate}
 ///   _AppMessagesKeys get messages => const _AppMessagesKeys._();
 /// }
 ///
@@ -77,7 +75,10 @@ class KeysBuilder implements Builder {
     if (result.isEmpty) return;
 
     // Write the generated Dart code to the corresponding .dart file.
-    await buildStep.writeAsString(buildStep.inputId.changeExtension('.dart'), result);
+    await buildStep.writeAsString(
+      buildStep.inputId.changeExtension('.dart'),
+      result,
+    );
   }
 
   /// Reads the input YAML file, parses it, and generates the corresponding Dart classes.
@@ -96,8 +97,9 @@ class KeysBuilder implements Builder {
     if (!path.endsWith('.keys.yml') && !path.endsWith('.keys.yaml')) return '';
 
     // Derive the base name from the input file name.
-    final baseName =
-        inputId.pathSegments.last.replaceAll('.keys.yaml', '').replaceAll('.keys.yml', '');
+    final baseName = inputId.pathSegments.last
+        .replaceAll('.keys.yaml', '')
+        .replaceAll('.keys.yml', '');
 
     // Convert the base name into a class name by capitalizing and appending "Keys".
     final className = '${_capitalize(_toCamelCase(baseName))}Keys';
@@ -117,7 +119,11 @@ class KeysBuilder implements Builder {
     );
 
     // Prepare the final output buffer.
-    final buffer = StringBuffer()..writeln('// GENERATED CODE - DO NOT MODIFY BY HAND\n');
+    final buffer = StringBuffer()
+      ..writeln('// GENERATED CODE - DO NOT MODIFY BY HAND (keys_generator)')
+      ..writeln('// SOURCE YAML - ${buildStep.inputId.uri}')
+      ..writeln('// ignore_for_file: library_private_types_in_public_api')
+      ..writeln('');
     for (final classDefinition in classes) {
       buffer.writeln(classDefinition);
     }
@@ -134,7 +140,8 @@ class KeysBuilder implements Builder {
   /// **Parameters:**
   /// - [className]: The name of the root class.
   /// - [map]: The parsed YAML map representing the keys.
-  /// - [scope]: The top-level scope of the keys, typically derived from the base file name.
+  /// - [scope]: The top-level scope of the keys,
+  ///   typically derived from the base file name.
   ///
   /// **Returns:**
   /// A list of strings, each representing a Dart class definition.
@@ -188,16 +195,21 @@ class KeysBuilder implements Builder {
     final classFields = <String>[];
 
     // Extract optional documentation from the "_doc_" key.
-    final docComment = current.map['_doc_'] is String ? current.map['_doc_'] as String : null;
+    final docComment =
+        current.map['_doc_'] is String ? current.map['_doc_'] as String : null;
     final nestedClassesScoped = <ClassInfo>[];
 
     // Iterate through the keys in the current YAML map.
     current.map.forEach((key, value) {
-      if (key == '_doc_') return; // Skip documentation keys from field generation.
+      if (key == '_doc_') {
+        return; // Skip documentation keys from field generation.
+      }
 
       // Compute the full path for nested keys, e.g., "app.messages.hello"
-      final fullPath = current.currentPath.isEmpty ? key : '${current.currentPath}.$key';
-      final variableValue = current.scope.isNotEmpty ? '${current.scope}.$fullPath' : fullPath;
+      final fullPath =
+          current.currentPath.isEmpty ? key : '${current.currentPath}.$key';
+      final variableValue =
+          current.scope.isNotEmpty ? '${current.scope}.$fullPath' : fullPath;
 
       // Generate a template name for documentation, using camelCase.
       final templateName = _toCamelCase(variableValue, '.');
@@ -247,7 +259,9 @@ class KeysBuilder implements Builder {
 
     // For the root class, provide a static singleton instance.
     if (current.currentPath.isEmpty) {
-      classBuffer.writeln('  static const ${current.className} i = ${current.className}._();');
+      classBuffer.writeln(
+        '  static const ${current.className} i = ${current.className}._();',
+      );
     }
 
     // Append all generated fields to the class.

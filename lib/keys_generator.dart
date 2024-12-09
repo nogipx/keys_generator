@@ -1,3 +1,3 @@
-library error_keys_generator;
+library keys_generator;
 
 export 'src/builder.dart';
