@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.5
+- fix: make singleton instance constant
+
 ## 1.0.4
 - feat: not use recursion and simplify passing docs comments
 

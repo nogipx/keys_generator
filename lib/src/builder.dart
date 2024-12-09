@@ -247,7 +247,7 @@ class KeysBuilder implements Builder {
 
     // For the root class, provide a static singleton instance.
     if (current.currentPath.isEmpty) {
-      classBuffer.writeln('  static final ${current.className} i = ${current.className}._();');
+      classBuffer.writeln('  static const ${current.className} i = ${current.className}._();');
     }
 
     // Append all generated fields to the class.
