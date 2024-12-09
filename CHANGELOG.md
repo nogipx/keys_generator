@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.7
+- feat: add example 
+- feat: rewrite generator and add extended docs 
+- fix: add lint ignores for generated files
+
 ## 1.0.6
 - fix: sdk constraints
 
