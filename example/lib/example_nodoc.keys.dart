@@ -26,4 +26,3 @@ class _ExampleNodocGroupListKeys {
   String get requiredDate => 'example_nodoc.group.list.required_date';
   String get requiredMoney => 'example_nodoc.group.list.required_money';
 }
-

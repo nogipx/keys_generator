@@ -14,51 +14,67 @@ typedef ClassInternalGenerationResult = ({
   String? doc,
 });
 
+/// Creates an instance of [KeysBuilder].
 Builder keysBuilder(BuilderOptions options) => KeysBuilder();
 
+/// A builder that generates Dart classes from YAML files with `.keys.yaml` or `.keys.yml` extensions.
 class KeysBuilder implements Builder {
+  /// Specifies the input and output file extensions.
   @override
   final buildExtensions = const {
     '.keys.yaml': ['.keys.dart'],
     '.keys.yml': ['.keys.dart'],
   };
 
+  /// The main build method invoked by the build system.
   @override
   Future<void> build(BuildStep buildStep) async {
     final result = await _generate(buildStep);
 
+    // If no content is generated, exit early to avoid writing empty files.
     if (result.isEmpty) return;
 
+    // Write the generated Dart code to the corresponding `.dart` file.
     await buildStep.writeAsString(
       buildStep.inputId.changeExtension('.dart'),
       result,
     );
   }
 
+  /// Generates Dart code based on the provided YAML file.
   Future<String> _generate(BuildStep buildStep) async {
     final inputId = buildStep.inputId;
     final path = inputId.path;
 
+    // Ensure the file has a valid `.keys.yml` or `.keys.yaml` extension.
     if (!path.endsWith('.keys.yml') && !path.endsWith('.keys.yaml')) return '';
 
+    // Extract the base name of the file without the extension.
     final baseName = inputId.pathSegments.last
         .replaceAll('.keys.yaml', '')
         .replaceAll('.keys.yml', '');
 
+    // Create the root class name by capitalizing and converting to camel case.
     final className = '${_capitalize(_toCamelCase(baseName))}Keys';
 
+    // Read the content of the YAML file.
     final content = await buildStep.readAsString(inputId);
     if (content.trim().isEmpty) {
+      // If the YAML file is empty, skip generation to prevent empty Dart files.
       return '';
     }
+
+    // Parse the YAML content into a YamlMap.
     final yamlMap = loadYaml(content) as YamlMap;
 
+    // Generate Dart classes based on the YAML structure.
     final classes = _generateClassesIterative(
       className: className,
       map: yamlMap,
       scope: baseName,
     );
 
+    // Build the final Dart code with headers and generated classes.
     final buffer = StringBuffer()
       ..writeln('// GENERATED CODE - DO NOT MODIFY BY HAND (keys_generator)')
       ..writeln('// SOURCE YAML - ${buildStep.inputId.uri}')
@@ -71,6 +87,10 @@ class KeysBuilder implements Builder {
     return buffer.toString();
   }
 
+  /// Iteratively generates Dart classes from the provided [YamlMap].
+  ///
+  /// This method uses a stack to handle nested classes without recursion,
+  /// which helps prevent stack overflow in deeply nested YAML structures.
   List<String> _generateClassesIterative({
     required String className,
     required YamlMap map,
@@ -92,14 +112,19 @@ class KeysBuilder implements Builder {
       final current = stack.removeLast();
       final generated = _generateClassFromInfo(current);
 
+      // Add any nested classes to the stack for further processing.
       stack.addAll(generated.nestedClasses);
 
+      // Collect the generated class string.
       allClasses.add(generated.classString);
     }
 
     return allClasses.toList();
   }
 
+  /// Generates a Dart class from the provided [ClassInfo].
+  ///
+  /// This method constructs the class definition, including fields and nested classes.
   ClassGenerationResult _generateClassFromInfo(ClassInfo info) {
     ClassInternalGenerationResult generationResult = (
       fields: [],
@@ -107,6 +132,7 @@ class KeysBuilder implements Builder {
       doc: '',
     );
 
+    // Determine whether to generate fields from a map or a list.
     if (info.map != null) {
       generationResult = _generateFieldsForMap(
         currentPath: info.currentPath,
@@ -121,24 +147,29 @@ class KeysBuilder implements Builder {
 
     final buffer = StringBuffer();
 
+    // Add documentation if available.
     if (generationResult.doc?.isNotEmpty == true) {
       buffer.writeln('/// ${generationResult.doc}');
     }
 
+    // Start the class definition.
     buffer
       ..writeln('class ${info.className} {')
       ..writeln('  const ${info.className}._();');
 
+    // If it's the root class, add a static instance for easy access.
     if (info.isRoot) {
       buffer.writeln(
         '  static const ${info.className} i = ${info.className}._();',
       );
     }
 
+    // Add all fields to the class.
     for (final field in generationResult.fields) {
       buffer.writeln(field);
     }
 
+    // Close the class definition.
     buffer.writeln('}');
 
     return (
@@ -147,6 +178,9 @@ class KeysBuilder implements Builder {
     );
   }
 
+  /// Generates fields for a class based on a [YamlMap].
+  ///
+  /// Handles different types of values (maps, lists, strings) and creates appropriate fields.
   ClassInternalGenerationResult _generateFieldsForMap({
     required String currentPath,
     required YamlMap map,
@@ -154,12 +188,14 @@ class KeysBuilder implements Builder {
     final fields = <String>[];
     final nestedClasses = <ClassInfo>[];
 
+    // Extract documentation if provided.
     final doc = map['_doc_'] ?? '';
 
     for (final entry in map.entries) {
       final key = entry.key;
       final value = entry.value;
 
+      // Skip documentation entries to avoid generating fields for them.
       if (key == '_doc_') {
         continue;
       }
@@ -167,9 +203,11 @@ class KeysBuilder implements Builder {
       final getterName = _toCamelCase(key);
       final fullPath = currentPath.isEmpty ? key : '$currentPath.$key';
 
+      // Generate a unique nested class name based on the path.
       final nestedClassName = '_${_capitalize(_toCamelCase(fullPath))}Keys';
 
       if (value is YamlMap) {
+        // If the value is a map, create a nested class with its own fields.
         final doc = value['_doc_'] ?? '';
         fields.add(
           "${doc is String && doc.isNotEmpty ? '\n  /// $doc\n' : ''}"
@@ -183,6 +221,7 @@ class KeysBuilder implements Builder {
           ),
         );
       } else if (value is YamlList) {
+        // If the value is a list, create fields based on the list items.
         final values = value.value.whereType<String>();
         final docRaw = _firstWhereOrNull(values, (e) => e.startsWith('//'));
         final doc = docRaw?.substring(2, docRaw.length).trim();
@@ -199,6 +238,7 @@ class KeysBuilder implements Builder {
           ),
         );
       } else {
+        // For simple string values, create a string getter.
         final getterValue = fullPath;
         fields.add(
           "${value is String && value.isNotEmpty ? '\n  /// $value\n' : ''}"
@@ -214,6 +254,9 @@ class KeysBuilder implements Builder {
     );
   }
 
+  /// Generates fields for a class based on a [YamlList].
+  ///
+  /// Handles list items, which can include documentation or nested keys.
   ClassInternalGenerationResult _generateFieldsForList({
     required String currentPath,
     required YamlList list,
@@ -223,7 +266,7 @@ class KeysBuilder implements Builder {
 
     for (final rawName in list) {
       if (rawName == null || rawName.toString().isEmpty) {
-        continue;
+        continue; // Skip empty or null entries.
       }
 
       String getterDoc = '';
@@ -231,12 +274,14 @@ class KeysBuilder implements Builder {
 
       if (rawName is String && rawName.contains('//')) {
         if (rawName.startsWith('//')) {
+          // If the item starts with `//`, treat the rest as class documentation.
           final docCandidate = rawName.substring(2, rawName.length).trim();
           if (docCandidate.isNotEmpty) {
             classDoc = docCandidate;
           }
-          continue;
+          continue; // Skip adding a field for documentation entries.
         } else {
+          // Split the item into name and documentation.
           final splittedName = rawName.split('//');
           name = splittedName.elementAtOrNull(0)?.trim() ?? rawName;
           getterDoc = splittedName.length > 1
@@ -262,6 +307,7 @@ class KeysBuilder implements Builder {
   }
 }
 
+/// Contains information about a class to be generated.
 class ClassInfo {
   final String className;
   final YamlMap? map;
@@ -286,6 +332,7 @@ class ClassInfo {
       ')';
 }
 
+/// Converts a string to camelCase.
 String _toCamelCase(String input) {
   final parts = input.split(RegExp(r'[_.]'));
   if (parts.isEmpty) return '';
@@ -297,11 +344,13 @@ String _toCamelCase(String input) {
   return head + tail;
 }
 
+/// Capitalizes the first letter of a string.
 String _capitalize(String input) {
   if (input.isEmpty) return '';
   return input[0].toUpperCase() + input.substring(1);
 }
 
+/// Returns the first element in [data] that satisfies [test], or `null` if none do.
 T? _firstWhereOrNull<T>(Iterable<T> data, bool Function(T element) test) {
   for (var element in data) {
     if (test(element)) return element;
