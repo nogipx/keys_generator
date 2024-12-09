@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.4
+- feat: not use recursion and simplify passing docs comments
+
 ## 1.0.3
 - fix: do not generate anything if yaml is empty
 

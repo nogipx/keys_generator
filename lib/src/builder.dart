@@ -3,20 +3,64 @@ import 'dart:async';
 import 'package:build/build.dart';
 import 'package:yaml/yaml.dart';
 
-/// Returns an instance of [KeysBuilder] as a [Builder].
+/// Provides an instance of [KeysBuilder] as a [Builder].
+///
+/// This function is invoked by the build system to instantiate the [KeysBuilder].
+/// It accepts [BuilderOptions] as a parameter, allowing for potential configuration
+/// of the builder if necessary.
 Builder keysBuilder(BuilderOptions options) => KeysBuilder();
 
 /// A [Builder] that transforms `.keys.yaml` or `.keys.yml` files into Dart code.
-/// It generates Dart classes with nested structures based on the YAML keys.
-/// Each key in the YAML file corresponds to a Dart property or nested class,
-/// allowing you to reference keys in code as static fields.
 ///
-/// Usage:
-/// - Place a YAML file ending with `.keys.yaml` or `.keys.yml`.
-/// - Run the build system (build_runner) to generate a corresponding `.keys.dart` file.
-/// - The generated file will contain a class (and possibly nested classes) with fields
-///   mirroring your YAML structure. Each field holds a string key suitable for localization,
-///   configuration, or resource management.
+/// The [KeysBuilder] processes YAML files defining hierarchical keys used for
+/// localization, configuration, or other resource-driven purposes. Each `.keys.yaml`
+/// or `.keys.yml` file is converted into a Dart file containing a class hierarchy
+/// that mirrors the structure of the YAML. Every key in the YAML file is exposed
+/// as a static field or a nested class, enabling developers to reference them
+/// directly in their Dart code.
+///
+/// **Example Usage:**
+///
+/// Consider a YAML file named `app.keys.yaml`:
+/// ```yaml
+/// _doc_: "Top-level documentation for these keys."
+/// title: "App Title"
+/// messages:
+///   _doc_: "Keys for messages displayed in the UI."
+///   hello: "Hello, World!"
+///   goodbye: "Goodbye!"
+/// ```
+///
+/// After running the builder, a Dart file `app.keys.dart` will be generated with the following content:
+///
+/// ```dart
+/// // GENERATED CODE - DO NOT MODIFY BY HAND
+/// class AppKeys {
+///   const AppKeys._();
+///   static final AppKeys i = AppKeys._();
+///
+///   /// App Title
+///   String get title => 'app.title';
+///
+///   /// {@template app.messages}
+///   /// Keys for messages displayed in the UI.
+///   /// {@endtemplate}
+///   _AppMessagesKeys get messages => const _AppMessagesKeys._();
+/// }
+///
+/// class _AppMessagesKeys {
+///   const _AppMessagesKeys._();
+///
+///   /// Hello, World!
+///   String get hello => 'app.messages.hello';
+///
+///   /// Goodbye!
+///   String get goodbye => 'app.messages.goodbye';
+/// }
+/// ```
+///
+/// **Note:** The underscore prefix in the names of generated nested classes ensures they
+/// do not conflict with top-level classes and minimizes the risk of naming collisions.
 class KeysBuilder implements Builder {
   @override
   final buildExtensions = const {
@@ -26,162 +70,255 @@ class KeysBuilder implements Builder {
 
   @override
   Future<void> build(BuildStep buildStep) async {
-    // Generate the Dart code from the given YAML file.
+    // Generate the Dart code from the provided YAML file.
     final result = await _generate(buildStep);
-    // If no code was generated (e.g., invalid file extension), skip writing.
+
+    // If no code was generated (e.g., the file is empty or invalid), skip writing.
     if (result.isEmpty) return;
-    // Write the generated Dart code into a .dart file.
+
+    // Write the generated Dart code to the corresponding .dart file.
     await buildStep.writeAsString(buildStep.inputId.changeExtension('.dart'), result);
   }
 
-  /// Generates the Dart code by reading the input YAML file, parsing its structure,
-  /// and then invoking [_generateClasses] to produce classes and fields.
+  /// Reads the input YAML file, parses it, and generates the corresponding Dart classes.
   ///
-  /// Returns an empty string if the file is not a recognized keys file.
+  /// This method identifies valid key files (those ending with `.keys.yaml` or
+  /// `.keys.yml`), extracts the base name for class naming, and delegates to
+  /// [_generateClassesIterative] to construct the class hierarchy.
+  ///
+  /// Returns an empty string if the input file does not match the expected pattern
+  /// or contains no content.
   Future<String> _generate(BuildStep buildStep) async {
-    final id = buildStep.inputId;
-    final path = id.path;
+    final inputId = buildStep.inputId;
+    final path = inputId.path;
 
-    // Only process files that end with .keys.yaml or .keys.yml
+    // Only process `.keys.yaml` or `.keys.yml` files.
     if (!path.endsWith('.keys.yml') && !path.endsWith('.keys.yaml')) return '';
 
-    // Extract the base name of the file by removing the .keys.yaml/.keys.yml part.
-    final baseName = id.pathSegments.last.replaceAll('.keys.yaml', '').replaceAll('.keys.yml', '');
+    // Derive the base name from the input file name.
+    final baseName =
+        inputId.pathSegments.last.replaceAll('.keys.yaml', '').replaceAll('.keys.yml', '');
 
-    // Convert the base name into a class name in PascalCase, appending "Keys".
+    // Convert the base name into a class name by capitalizing and appending "Keys".
     final className = '${_capitalize(_toCamelCase(baseName))}Keys';
 
-    // Read and parse the YAML content into a YamlMap.
-    final content = await buildStep.readAsString(id);
+    // Read and parse the YAML content.
+    final content = await buildStep.readAsString(inputId);
     if (content.trim().isEmpty) {
       return '';
     }
     final yamlMap = loadYaml(content) as YamlMap;
 
-    // Generate a list of classes (the main class and any nested classes).
-    final classes = _generateClasses(
+    // Generate classes using an iterative approach (avoiding recursion).
+    final classes = _generateClassesIterative(
       className: className,
       map: yamlMap,
       scope: baseName,
     );
 
-    // Create a buffer for the generated Dart code.
+    // Prepare the final output buffer.
     final buffer = StringBuffer()..writeln('// GENERATED CODE - DO NOT MODIFY BY HAND\n');
-    for (final c in classes) {
-      buffer.writeln(c);
+    for (final classDefinition in classes) {
+      buffer.writeln(classDefinition);
     }
 
     return buffer.toString();
   }
 
-  /// Recursively generates Dart classes and their fields from the given [map].
+  /// Iteratively generates Dart classes and their fields from a YAML map.
   ///
-  /// Parameters:
-  /// - [className]: The name of the class being generated.
-  /// - [map]: The YamlMap representing the keys and possibly nested maps.
-  /// - [scope]: A string representing the hierarchical path of keys, used to generate unique values.
-  /// - [currentPath]: Tracks the current path of nested keys. For top-level, this is empty.
-  /// - [docTemplateName]: If doc comments (templates) are present, this name helps identify them.
+  /// Unlike a recursive approach, this method uses a stack to manage nested
+  /// structures. Each [ClassInfo] object on the stack represents a class to
+  /// generate.
   ///
-  /// The method returns a list of class definitions as strings.
-  /// The first item is the current class definition, followed by any nested classes.
-  List<String> _generateClasses({
+  /// **Parameters:**
+  /// - [className]: The name of the root class.
+  /// - [map]: The parsed YAML map representing the keys.
+  /// - [scope]: The top-level scope of the keys, typically derived from the base file name.
+  ///
+  /// **Returns:**
+  /// A list of strings, each representing a Dart class definition.
+  List<String> _generateClassesIterative({
     required String className,
     required YamlMap map,
     required String scope,
-    String currentPath = '',
-    String docTemplateName = '',
   }) {
-    final mainBuffer = StringBuffer();
-    final nestedClasses = <String>[];
-    final fields = <String>[];
+    // Initialize a stack with the root class information.
+    final stack = <ClassInfo>[];
+    stack.add(
+      ClassInfo(
+        className: className,
+        map: map,
+        scope: scope,
+        currentPath: '',
+        docTemplateName: '',
+      ),
+    );
 
-    // If the YAML map has a "_doc_" key, treat it as documentation for this class.
-    final docComment = map['_doc_'] is String ? map['_doc_'] as String : null;
+    // Accumulate all class definitions here.
+    final allClasses = <String>[];
 
-    // Iterate over each key in the YAML map.
-    // If the value is another map, we create a nested class.
-    // If the value is a string, we create a string field.
-    map.forEach((key, value) {
-      if (key == '_doc_') return; // Skip doc key from generating fields.
+    while (stack.isNotEmpty) {
+      final current = stack.removeLast();
+      final generated = _generateClassFromInfo(current);
 
-      final fullPath = currentPath.isEmpty ? key : '$currentPath.$key';
-      final variableValue = scope.isNotEmpty ? '$scope.$fullPath' : fullPath;
-      // Convert the full path into a template name for documentation placeholders.
+      // Add any nested classes to the stack for processing.
+      stack.addAll(generated.nestedClasses);
+
+      // Add the current class definition to the list.
+      allClasses.add(generated.classString);
+    }
+
+    return allClasses.toList();
+  }
+
+  /// Generates a Dart class definition from the given [ClassInfo].
+  ///
+  /// This method constructs the class structure, including fields and nested
+  /// classes, based on the provided YAML map and class information.
+  ///
+  /// **Returns:**
+  /// A tuple containing the class definition as a string and any nested classes
+  /// that need to be generated.
+  ({
+    String classString,
+    Iterable<ClassInfo> nestedClasses,
+  }) _generateClassFromInfo(ClassInfo current) {
+    final classBuffer = StringBuffer();
+    final classFields = <String>[];
+
+    // Extract optional documentation from the "_doc_" key.
+    final docComment = current.map['_doc_'] is String ? current.map['_doc_'] as String : null;
+    final nestedClassesScoped = <ClassInfo>[];
+
+    // Iterate through the keys in the current YAML map.
+    current.map.forEach((key, value) {
+      if (key == '_doc_') return; // Skip documentation keys from field generation.
+
+      // Compute the full path for nested keys, e.g., "app.messages.hello"
+      final fullPath = current.currentPath.isEmpty ? key : '${current.currentPath}.$key';
+      final variableValue = current.scope.isNotEmpty ? '${current.scope}.$fullPath' : fullPath;
+
+      // Generate a template name for documentation, using camelCase.
       final templateName = _toCamelCase(variableValue, '.');
       final camelKey = _toCamelCase(key);
 
       if (value is YamlMap) {
-        // For nested maps, we create a nested class.
-        // The nested class name is derived by capitalizing each part of the path.
+        // For nested YAML maps, generate a nested class.
+        // Example: "messages.hello" becomes "_AppMessagesKeys" class.
         final classPath = fullPath.split('.').map(_capitalize).join('_');
         final nestedClassName = '_${_capitalize(_toCamelCase(classPath))}Keys';
+        final nestedDoc = value['_doc_'];
 
-        // Add a reference field to the nested class instance.
-        fields.add('  /// {@macro $templateName}');
-        fields.add('  $nestedClassName get $camelKey => const $nestedClassName._();');
+        // Add a reference to the nested class as a getter.
+        classFields.add(
+          "${nestedDoc is String && nestedDoc.isNotEmpty ? '\n  /// $nestedDoc\n' : ''}"
+          "  $nestedClassName get $camelKey => const $nestedClassName._();",
+        );
 
-        // Recursively generate the nested classes.
-        nestedClasses.addAll(_generateClasses(
-          className: nestedClassName,
-          docTemplateName: templateName,
-          map: value,
-          currentPath: fullPath,
-          scope: scope,
-        ));
-      } else if (value is String) {
-        // For strings, we create a string field that holds the generated key path.
-        fields.add('  /// $value');
-        fields.add("  String get $camelKey => '$variableValue';");
+        // Push the nested class onto the stack for later processing.
+        nestedClassesScoped.add(
+          ClassInfo(
+            className: nestedClassName,
+            map: value,
+            scope: current.scope,
+            currentPath: fullPath,
+            docTemplateName: templateName,
+          ),
+        );
+      } else {
+        // For terminal string values, create a property returning the key string.
+        classFields.add(
+          "${value is String && value.isNotEmpty ? '\n  /// $value\n' : ''}"
+          "  String get $camelKey => '$variableValue';",
+        );
       }
     });
 
-    // If we have a doc comment and a template name, wrap it in a doc template.
-    if (docComment != null && docTemplateName.isNotEmpty) {
-      mainBuffer
-        ..writeln('/// {@template $docTemplateName}')
-        ..writeln('/// $docComment')
-        ..writeln('/// {@endtemplate}');
+    // If there is a doc comment and a doc template name, wrap it in a doc template.
+    if (docComment != null) {
+      classBuffer.writeln('/// $docComment');
     }
 
-    // Define the class, starting with its constructor and static instance if top-level.
-    mainBuffer
-      ..writeln('class $className {')
-      ..writeln('  const $className._();');
+    // Define the class with a private constructor.
+    classBuffer
+      ..writeln('class ${current.className} {')
+      ..writeln('  const ${current.className}._();');
 
-    // For the root class (no currentPath), add a static instance.
-    if (currentPath.isEmpty) {
-      mainBuffer.writeln('  static final $className i = $className._();');
+    // For the root class, provide a static singleton instance.
+    if (current.currentPath.isEmpty) {
+      classBuffer.writeln('  static final ${current.className} i = ${current.className}._();');
     }
 
-    // Add all generated fields to the class.
-    for (final field in fields) {
-      mainBuffer.writeln(field);
+    // Append all generated fields to the class.
+    for (final field in classFields) {
+      classBuffer.writeln(field);
     }
 
-    mainBuffer.writeln('}');
+    classBuffer.writeln('}');
 
-    // Return this class's definition along with any nested classes.
-    return [mainBuffer.toString(), ...nestedClasses];
+    // Return the class definition and any nested classes.
+    return (
+      classString: classBuffer.toString(),
+      nestedClasses: nestedClassesScoped,
+    );
   }
 
-  /// Converts a string to camelCase, using [sep] as a separator to split words.
+  /// Converts a string to camelCase. By default, splits on underscores (`_`),
+  /// but a custom separator can be provided.
   ///
-  /// For example:
-  /// - `_toCamelCase("my_example")` -> "myExample"
-  /// - `_toCamelCase("my.example", ".")` -> "myExample"
+  /// **Examples:**
+  /// - `_toCamelCase("my_example")` returns `"myExample"`
+  /// - `_toCamelCase("my.example", ".")` returns `"myExample"`
   String _toCamelCase(String input, [String sep = '_']) {
     final parts = input.split(sep);
     if (parts.isEmpty) return '';
     final head = parts.first;
-    final tail =
-        parts.skip(1).map((s) => s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1)).join('');
+    final tail = parts.skip(1).map((s) {
+      if (s.isEmpty) return '';
+      return s[0].toUpperCase() + s.substring(1);
+    }).join('');
     return head + tail;
   }
 
-  /// Capitalizes the first letter of the given string.
+  /// Capitalizes the first character of a string.
   ///
-  /// For example: `_capitalize("example")` -> "Example".
-  String _capitalize(String input) =>
-      input.isEmpty ? '' : input[0].toUpperCase() + input.substring(1);
+  /// **Example:**
+  /// - `_capitalize("example")` returns `"Example"`
+  String _capitalize(String input) {
+    if (input.isEmpty) return '';
+    return input[0].toUpperCase() + input.substring(1);
+  }
+}
+
+/// A helper class used during iterative class generation.
+///
+/// Each [ClassInfo] instance represents a single class to be generated, along with the
+/// necessary context and metadata. This includes the class name, the subset of the
+/// YAML map it represents, the current key path, and any associated documentation.
+class ClassInfo {
+  /// The name of the Dart class to be generated.
+  final String className;
+
+  /// The portion of the YAML map representing this class and its fields.
+  final YamlMap map;
+
+  /// The top-level scope (usually the base file name) used to prefix keys.
+  final String scope;
+
+  /// The current hierarchical path of keys leading to this class.
+  final String currentPath;
+
+  /// The template name used for documentation comments, enabling reusability of doc templates
+  /// in nested classes.
+  final String docTemplateName;
+
+  /// Constructs a [ClassInfo] instance with the provided parameters.
+  ClassInfo({
+    required this.className,
+    required this.map,
+    required this.scope,
+    required this.currentPath,
+    required this.docTemplateName,
+  });
 }
