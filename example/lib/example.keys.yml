@@ -10,5 +10,5 @@ group:
 map:
   _doc_: Map-based dartdoc for group of keys (example.map)
   required_money:
-  required_date: Map-based dartdoc for particular key (example.map.required_date)
+  #required_date: Map-based dartdoc for particular key (example.map.required_date)
 

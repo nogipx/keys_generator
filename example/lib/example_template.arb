@@ -1,32 +1,21 @@
 {
   "@@locale": "",
-  "@": {
-    "description": "Dartdoc for entrypoint instance"
-  },
   "title": "",
   "@title": {
     "description": "Top-level keys (example.title)"
   },
-  "group": {
-    "list": {
-      "@": {
-        "description": "List-based dartdoc for group of keys (example.group.list)"
-      },
-      "required_date": "",
-      "@required_date": {
-        "description": "List-based dartdoc for particular key (example.group.list.required_date)"
-      },
-      "required_money": ""
-    }
+  "group.list.requiredDate": "",
+  "@group.list.requiredDate": {
+    "description": "List-based dartdoc for particular key (example.group.list.required_date)"
   },
-  "map": {
-    "@": {
-      "description": "Map-based dartdoc for group of keys (example.map)"
-    },
-    "required_money": "",
-    "required_date": "",
-    "@required_date": {
-      "description": "Map-based dartdoc for particular key (example.map.required_date)"
-    }
+  "group.list.requiredMoney": "пумпум",
+  "map.requiredMoney": "",
+  "map.requiredDate": "юлюлю",
+  "@map.requiredDate": {
+    "description": "Map-based dartdoc for particular key (example.map.required_date)"
+  },
+  "requiredDate": "",
+  "@requiredDate": {
+    "description": "Map-based dartdoc for particular key (example.map.required_date)"
   }
 }
