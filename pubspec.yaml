@@ -1,6 +1,6 @@
 name: keys_generator
 description: Keys class hierarchy generator from Yaml files.
-version: 1.1.0
+version: 1.1.1
 repository: https://github.com/nogipx/keys_generator
 
 environment:

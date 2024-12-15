@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+- fix: valid arb file generation
+- fix: add scope to arb keys
+
 ## 1.1.0
 - feat: add sorting arb according yaml
 
