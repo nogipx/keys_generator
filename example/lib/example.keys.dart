@@ -38,4 +38,6 @@ class _ExampleGroupListKeys {
   /// List-based dartdoc for particular key (example.group.list.required_date)
   String get requiredDate => 'example.group.list.required_date';
   String get requiredMoney => 'example.group.list.required_money';
+  String get requiredTest => 'example.group.list.required_test';
 }
+

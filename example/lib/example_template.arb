@@ -9,15 +9,15 @@
   },
   "group": {
     "list": {
-      "@": {
-        "description": "List-based dartdoc for group of keys (example.group.list)"
-      },
-      "required_date": "Date is required",
+      "required_date": "",
       "@required_date": {
         "description": "List-based dartdoc for particular key (example.group.list.required_date)"
       },
       "required_money": "",
-      "required_test": ""
+      "required_test": "",
+      "@": {
+        "description": "List-based dartdoc for group of keys (example.group.list)"
+      }
     }
   },
   "map": {

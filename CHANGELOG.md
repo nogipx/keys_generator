@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.9
+- fix: remove generation and enable augmentation by default
+
 ## 1.0.8
 - feat: add ARB file generation
 - feat: add ARB file augmentation
