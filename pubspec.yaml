@@ -7,7 +7,7 @@ environment:
   sdk: '>=3.0.0 <4.0.0'
 
 executables:
-  keys_to_arb: bin/to_arb.dart
+  keys_to_arb: to_arb
 
 # Add regular dependencies here.
 dependencies:

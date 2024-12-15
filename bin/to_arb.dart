@@ -8,11 +8,13 @@ void main(List<String> args) {
   parser.addOption('yamlPath', abbr: 'f', mandatory: true);
   parser.addOption('outputPath', abbr: 'o', mandatory: true);
   parser.addFlag('formatArb', defaultsTo: true);
+  parser.addFlag('augment', defaultsTo: true);
 
   final result = parser.parse(args);
   final yamlPath = result.option('yamlPath');
   final outputPath = result.option('outputPath');
   final formatArb = result.flag('formatArb');
+  final augment = result.flag('augment');
 
   try {
     ArgumentError.checkNotNull(yamlPath, 'yamlPath');
@@ -26,7 +28,12 @@ void main(List<String> args) {
   }
 
   try {
-    generateArbFromYaml(yamlPath, outputPath);
+    if (augment) {
+      augmentArbFromYaml(yamlPath, outputPath);
+    } else {
+      generateArbFromYaml(yamlPath, outputPath);
+    }
+
     if (formatArb) {
       formatArbFile(outputPath);
     }
@@ -123,4 +130,92 @@ void generateArbFromYaml(String yamlPath, String arbPath) {
   final arbFile = File(arbPath);
   arbFile.writeAsStringSync(formattedContent);
   print('ARB successfully generated: $arbPath');
+}
+
+/// Догенерация ARB из YAML
+void augmentArbFromYaml(String yamlPath, String arbPath) {
+  final yamlFile = File(yamlPath);
+  if (!yamlFile.existsSync()) {
+    throw Exception('YAML file not found for augment ARB: $yamlPath');
+  }
+
+  final arbFile = File(arbPath);
+  Map<String, dynamic> arbContent = {};
+
+  // Если ARB файл существует, читаем его содержимое
+  if (arbFile.existsSync()) {
+    final content = arbFile.readAsStringSync();
+    arbContent = jsonDecode(content);
+  }
+
+  // Устанавливаем локаль, если её нет
+  if (!arbContent.containsKey('@@locale')) {
+    arbContent['@@locale'] = '';
+  }
+
+  final yamlContent = loadYaml(yamlFile.readAsStringSync());
+
+  /// Рекурсивная функция для обработки YAML
+  void processYaml(dynamic input, Map<String, dynamic> arb,
+      [String? parentDoc]) {
+    if (input is Map) {
+      // Если есть _doc_, добавляем описание для группы
+      if (input.containsKey('_doc_') && !arb.containsKey('@')) {
+        arb['@'] = {'description': input['_doc_']};
+      }
+
+      input.forEach((key, value) {
+        if (key == '_doc_') return; // Пропускаем служебный ключ
+        if (value is Map || value is List) {
+          if (!arb.containsKey(key)) {
+            arb[key] = {};
+          }
+          processYaml(value, arb[key], value is Map ? value['_doc_'] : null);
+        } else {
+          if (!arb.containsKey(key)) {
+            arb[key] = ""; // Добавляем ключ с пустым значением
+          }
+          if (value is String &&
+              value.trim().isNotEmpty &&
+              !arb.containsKey('@$key')) {
+            arb['@$key'] = {'description': value};
+          }
+        }
+      });
+    } else if (input is List) {
+      if (parentDoc != null && !arb.containsKey('@')) {
+        arb['@'] = {'description': parentDoc};
+      }
+      for (var item in input) {
+        if (item is String && item.startsWith('//')) {
+          parentDoc = item.substring(2).trim();
+          if (!arb.containsKey('@')) {
+            arb['@'] = {'description': parentDoc};
+          }
+        } else if (item is String && item.contains(' // ')) {
+          final parts = item.split(' // ');
+          final key = parts[0].trim();
+          final description = parts[1].trim();
+          if (!arb.containsKey(key)) {
+            arb[key] = "";
+          }
+          if (!arb.containsKey('@$key')) {
+            arb['@$key'] = {'description': description};
+          }
+        } else if (item is String) {
+          if (!arb.containsKey(item)) {
+            arb[item] = "";
+          }
+        }
+      }
+    }
+  }
+
+  processYaml(yamlContent, arbContent);
+
+  // Записываем результат в JSON
+  final encoder = JsonEncoder.withIndent('  ');
+  final formattedContent = encoder.convert(arbContent);
+  arbFile.writeAsStringSync(formattedContent);
+  print('ARB successfully augmented: $arbPath');
 }

@@ -2,6 +2,7 @@
 
 ## 1.0.8
 - feat: add ARB file generation
+- feat: add ARB file augmentation
 
 ## 1.0.7
 - feat: add example 
