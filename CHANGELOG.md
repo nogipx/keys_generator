@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.8
+- feat: add ARB file generation
+
 ## 1.0.7
 - feat: add example 
 - feat: rewrite generator and add extended docs 
