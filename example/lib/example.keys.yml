@@ -3,13 +3,13 @@ title: Top-level keys (example.title)
 
 group:
   list:
+    - required_test
     - // List-based dartdoc for group of keys (example.group.list)
     - required_date // List-based dartdoc for particular key (example.group.list.required_date)
     - required_money
-    - required_test
     -
 
 map:
   _doc_: Map-based dartdoc for group of keys (example.map)
-  required_date: Map-based dartdoc for particular key (example.map.required_date)
   required_money:
+  required_date: Map-based dartdoc for particular key (example.map.required_date)
