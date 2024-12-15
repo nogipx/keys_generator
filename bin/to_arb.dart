@@ -25,8 +25,15 @@ void main(List<String> args) {
     throw ArgumentError('Required fields empty');
   }
 
+  // Extract the base name of the file without the extension.
+  final scope = Uri.parse(yamlPath)
+      .pathSegments
+      .last
+      .replaceAll('.keys.yaml', '')
+      .replaceAll('.keys.yml', '');
+
   try {
-    augmentArbFromYaml(yamlPath, outputPath);
+    augmentArbFromYaml(yamlPath, outputPath, scope);
 
     if (formatArb) {
       formatArbFile(outputPath);

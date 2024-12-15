@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
-void augmentArbFromYaml(String yamlPath, String arbPath) {
+void augmentArbFromYaml(String yamlPath, String arbPath, String scope) {
   final yamlFile = File(yamlPath);
   if (!yamlFile.existsSync()) {
     throw Exception('YAML file not found: $yamlPath');
@@ -59,6 +59,8 @@ void augmentArbFromYaml(String yamlPath, String arbPath) {
     return [first, ...rest].join('');
   }
 
+  final targetScope = toCamelCase(scope);
+
   String camelCaseKey(String key) {
     if (key.isEmpty) return key;
     final segments = key.split('.');
@@ -71,7 +73,7 @@ void augmentArbFromYaml(String yamlPath, String arbPath) {
   /// Если ключа нет, добавляем со значением "".
   /// Если есть описание - добавляем/обновляем @key.
   void ensureKeyAndDescription(String rawKey, String? newDesc) {
-    final finalKey = camelCaseKey(rawKey);
+    final finalKey = '$targetScope.${camelCaseKey(rawKey)}';
 
     // Если ключа нет - добавляем его с пустым значением.
     if (!newArb.containsKey(finalKey)) {

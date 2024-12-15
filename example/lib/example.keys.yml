@@ -1,6 +1,9 @@
 _doc_: Dartdoc for entrypoint instance
 title: Top-level keys (example.title)
 
+test_snake:
+  snake_str_1: Some value
+
 group:
   list:
     - // List-based dartdoc for group of keys (example.group.list)
@@ -9,6 +12,6 @@ group:
 
 map:
   _doc_: Map-based dartdoc for group of keys (example.map)
+  required_date: Map-based dartdoc for particular key (example.map.required_date)
   required_money:
-  #required_date: Map-based dartdoc for particular key (example.map.required_date)
 

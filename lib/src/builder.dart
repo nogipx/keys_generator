@@ -71,7 +71,7 @@ class KeysBuilder implements Builder {
     final classes = _generateClassesIterative(
       className: className,
       map: yamlMap,
-      scope: baseName,
+      scope: _toCamelCase(baseName),
     );
 
     // Build the final Dart code with headers and generated classes.
@@ -201,7 +201,8 @@ class KeysBuilder implements Builder {
       }
 
       final getterName = _toCamelCase(key);
-      final fullPath = currentPath.isEmpty ? key : '$currentPath.$key';
+      final fullPath =
+          currentPath.isEmpty ? key : '$currentPath.${_toCamelCase(key)}';
 
       // Generate a unique nested class name based on the path.
       final nestedClassName = '_${_capitalize(_toCamelCase(fullPath))}Keys';
@@ -291,7 +292,7 @@ class KeysBuilder implements Builder {
       }
 
       final getterName = _toCamelCase(name);
-      final getterValue = '$currentPath.$name';
+      final getterValue = '$currentPath.$getterName';
 
       fields.add(
         "${getterDoc.isNotEmpty ? '\n  /// $getterDoc\n' : ''}"
