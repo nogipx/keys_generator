@@ -1,12 +1,14 @@
 {
   "@@locale": "",
+  "@": {
+    "description": "Dartdoc for entrypoint instance"
+  },
   "title": "",
   "@title": {
     "description": "Top-level keys (example.title)"
   },
   "group": {
     "list": {
-      "required_test": "",
       "@": {
         "description": "List-based dartdoc for group of keys (example.group.list)"
       },

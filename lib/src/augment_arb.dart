@@ -6,89 +6,115 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
-/// Генерация или аугментация ARB из YAML
+/// Аугментация ARB из YAML с учетом порядка ключей и комментариев для групп.
+/// Порядок:
+/// 1. На верхнем уровне @@locale всегда первый.
+/// 2. Если есть описание для группы (arb['@']), оно идёт сразу после @@locale (если есть) или первым.
+/// 3. Ключи в том порядке, в котором они указаны в YAML.
+/// 4. Ключи, отсутствующие в YAML, но присутствующие в ARB, идут в конце, отсортированные по алфавиту.
+/// 5. Описания для отдельных ключей (@$key) идут сразу после соответствующего ключа.
+/// Если при повторной генерации изменится порядок ключей в YAML, порядок в ARB тоже изменится.
+
 void augmentArbFromYaml(String yamlPath, String arbPath) {
   final yamlFile = File(yamlPath);
   if (!yamlFile.existsSync()) {
-    throw Exception('YAML file not found for augment ARB: $yamlPath');
+    throw Exception('YAML file not found: $yamlPath');
   }
 
   final arbFile = File(arbPath);
-  LinkedHashMap<String, dynamic> arbContent = LinkedHashMap();
-
   if (!arbFile.existsSync()) {
     arbFile.createSync(recursive: true);
   }
 
-  // Если ARB файл существует, читаем его содержимое
+  // Читаем ARB
+  LinkedHashMap<String, dynamic> arbContent;
   final content = arbFile.readAsStringSync();
-  arbContent = content.isNotEmpty
+  arbContent = content.trim().isNotEmpty
       ? LinkedHashMap.from(jsonDecode(content))
       : LinkedHashMap();
 
-  // Устанавливаем локаль, если её нет
+  // Устанавливаем @@locale, если нет
   if (!arbContent.containsKey('@@locale')) {
     arbContent['@@locale'] = '';
   }
 
-  final yamlContent = loadYaml(yamlFile.readAsStringSync());
+  // Читаем YAML
+  final yamlRoot = loadYaml(yamlFile.readAsStringSync());
 
-  /// Конвертирует YamlMap в Map<String, dynamic>
-  dynamic yamlToMap(dynamic yaml) {
+  /// Преобразуем YamlNode в обычные структуры Dart с сохранением порядка.
+  dynamic yamlToDart(dynamic yaml) {
     if (yaml is YamlMap) {
-      return LinkedHashMap<String, dynamic>.fromEntries(
-        yaml.entries.map(
-          (e) => MapEntry(
-            e.key.toString(),
-            yamlToMap(e.value), // Рекурсивное преобразование значений
-          ),
-        ),
-      );
+      final map = LinkedHashMap<String, dynamic>();
+      for (var key in yaml.keys) {
+        map[key.toString()] = yamlToDart(yaml[key]);
+      }
+      return map;
     } else if (yaml is YamlList) {
-      return yaml.map(yamlToMap).toList(); // Преобразуем список рекурсивно
+      return yaml.map(yamlToDart).toList();
     } else {
-      return yaml; // Для скалярных значений возвращаем их напрямую
+      return yaml; // скаляр
     }
   }
 
-  /// Основной парсинг YAML в структуру
-  final parsedYaml = yamlToMap(yamlContent);
+  final parsedYaml = yamlToDart(yamlRoot);
 
-  /// Рекурсивная функция для обработки YAML и дополнения ARB
-  void processYaml(
-      dynamic input, LinkedHashMap<String, dynamic> arb, List<String> keyOrder,
+  /// Извлекает ключи из YAML-списка в порядке появления.
+  List<String> extractKeysFromYamlList(List yamlList) {
+    final result = <String>[];
+    for (var item in yamlList) {
+      if (item is String) {
+        if (item.startsWith('//')) {
+          continue; // комментарий
+        }
+        final key =
+            item.contains(' // ') ? item.split(' // ')[0].trim() : item.trim();
+        if (key.isNotEmpty && !key.startsWith('//')) {
+          result.add(key);
+        }
+      } else if (item is Map || item is List) {
+        // В списках вложенные структуры не добавляют ключи на этом уровне,
+        // их порядок будет учтён рекурсивно при сортировке.
+      }
+    }
+    return result;
+  }
+
+  /// Находим соответствующую YAML-структуру для ключа k в списке YAML
+  dynamic findYamlForKeyInList(List yamlList, String k) {
+    for (var item in yamlList) {
+      if (item is Map && item.containsKey(k)) {
+        return item[k];
+      } else if (item is List) {
+        // Если нужно более глубокое распознавание, можно добавить логику тут.
+      }
+    }
+    return null;
+  }
+
+  /// Обрабатываем YAML для добавления/обновления ключей в ARB.
+  /// Здесь же обрабатываем _doc_ и комментарии для групп, записывая их в arb['@'].
+  void processYaml(dynamic yaml, LinkedHashMap<String, dynamic> arb,
       [String? parentDoc]) {
-    if (input is Map<String, dynamic>) {
-      // Если есть _doc_, добавляем описание для группы, если его ещё нет
-      if (input.containsKey('_doc_') && !arb.containsKey('@')) {
-        arb['@'] = {'description': input['_doc_']};
+    if (yaml is Map<String, dynamic>) {
+      // Если есть _doc_, добавляем описание для группы
+      if (yaml.containsKey('_doc_') && !arb.containsKey('@')) {
+        arb['@'] = {'description': yaml['_doc_']};
       }
 
-      input.forEach((key, value) {
+      yaml.forEach((key, value) {
         if (key == '_doc_') return; // Пропускаем служебный ключ
         if (value is Map<String, dynamic> || value is List) {
-          // Если вложенный объект, добавляем его и рекурсивно обрабатываем
+          // Вложенная структура
           if (!arb.containsKey(key)) {
             arb[key] = LinkedHashMap<String, dynamic>();
           }
-          if (!keyOrder.contains(key)) {
-            keyOrder.add(key);
-          }
-          processYaml(
-            value,
-            (arb[key] as LinkedHashMap<String, dynamic>),
-            keyOrder,
-            value is Map<String, dynamic> ? value['_doc_'] : null,
-          );
+          processYaml(value, arb[key],
+              value is Map<String, dynamic> ? value['_doc_'] : null);
         } else {
-          // Если ключ отсутствует, добавляем его с пустым значением
+          // Скалярное значение - описание ключа
           if (!arb.containsKey(key)) {
-            arb[key] = ""; // Добавляем ключ с пустым значением
+            arb[key] = "";
           }
-          if (!keyOrder.contains(key)) {
-            keyOrder.add(key);
-          }
-          // Если описание отсутствует, добавляем его
           if (value is String &&
               value.trim().isNotEmpty &&
               !arb.containsKey('@$key')) {
@@ -96,106 +122,138 @@ void augmentArbFromYaml(String yamlPath, String arbPath) {
           }
         }
       });
-    } else if (input is List) {
-      if (parentDoc != null) {
-        arb['@'] = {'description': parentDoc}; // Описание для группы списка
+    } else if (yaml is List) {
+      // Список
+      String? currentParentDoc = parentDoc;
+      if (parentDoc != null && !arb.containsKey('@')) {
+        arb['@'] = {'description': parentDoc};
       }
 
-      for (var item in input) {
+      for (var item in yaml) {
         if (item is String) {
           if (item.startsWith('//')) {
-            // Это комментарий для группы
-            parentDoc = item
-                .substring(2)
-                .trim(); // Удаляем `//` и сохраняем как описание группы
-            arb['@'] = {'description': parentDoc};
+            // Комментарий для группы
+            currentParentDoc = item.substring(2).trim();
+            arb['@'] = {'description': currentParentDoc};
             continue;
           }
 
+          // "ключ // описание"
           if (item.contains(' // ')) {
-            // Элемент с ключом и комментарием
             final parts = item.split(' // ');
             final key = parts[0].trim();
             final description = parts[1].trim();
-
             if (!arb.containsKey(key)) {
-              arb[key] = ""; // Добавляем ключ с пустым значением
-              arb['@$key'] = {'description': description}; // Добавляем описание
+              arb[key] = "";
             }
-            if (!keyOrder.contains(key)) {
-              keyOrder.add(key);
+            if (!arb.containsKey('@$key')) {
+              arb['@$key'] = {'description': description};
             }
           } else if (item.trim().isNotEmpty) {
-            // Элемент списка без комментария
+            // Просто ключ
             if (!arb.containsKey(item)) {
-              arb[item] = ""; // Добавляем ключ с пустым значением
-            }
-            if (!keyOrder.contains(item)) {
-              keyOrder.add(item);
+              arb[item] = "";
             }
           }
+        } else {
+          // Вложенная структура
+          processYaml(item, arb, currentParentDoc);
         }
       }
     }
   }
 
-  // Упорядочить ключи, включая существующие и новые
-  List<String> keyOrder = [];
+  /// Рекурсивная сортировка ARB в соответствии с порядком из YAML.
+  /// - @@locale на верхнем уровне всегда первый
+  /// - Если есть описание группы arb['@'], оно идёт сразу после @@locale (если есть) или первым
+  /// - Ключи из YAML в указанном порядке
+  /// - Ключи, отсутствующие в YAML, по алфавиту в конце
+  /// - Описания ключей (@$key) после ключей
+  void sortArbAccordingToYaml(dynamic yaml, dynamic arb,
+      {bool isTopLevel = false}) {
+    if (arb is! Map<String, dynamic>) return;
+    if (yaml is! Map && yaml is! List) return;
 
-  // Добавляем порядок из YAML
-  void collectKeys(dynamic yaml, List<String> order) {
-    if (yaml is YamlMap) {
-      for (var key in yaml.keys) {
-        if (!order.contains(key.toString())) {
-          order.add(key.toString());
-        }
-        collectKeys(yaml[key], order);
+    final arbKeys =
+        arb.keys.where((k) => !k.startsWith('@') && k != '@@locale').toList();
+    final hasLocale = isTopLevel && arb.containsKey('@@locale');
+    final hasGroupDoc = arb.containsKey('@'); // описание для самой группы
+
+    List<String> yamlOrder = [];
+    if (yaml is Map<String, dynamic>) {
+      yamlOrder = yaml.keys
+          .where((k) => k != '_doc_')
+          .map((k) => k.toString())
+          .toList();
+    } else if (yaml is List) {
+      yamlOrder = extractKeysFromYamlList(yaml);
+    }
+
+    final keysFromYaml = arbKeys.where((k) => yamlOrder.contains(k)).toList();
+    final extraKeys = arbKeys.where((k) => !yamlOrder.contains(k)).toList();
+    extraKeys.sort();
+
+    // Формируем новый порядок
+    final newOrder = <String>[];
+
+    // @@locale всегда первый, если есть
+    if (hasLocale) {
+      newOrder.add('@@locale');
+    }
+
+    // @ для группы (описание группы), если есть
+    // Добавляем сразу после @@locale или первым, если @@locale нет
+    if (hasGroupDoc) {
+      newOrder.add('@');
+    }
+
+    // Ключи из YAML в порядке их появления
+    for (var yk in yamlOrder) {
+      if (keysFromYaml.contains(yk)) {
+        newOrder.add(yk);
       }
-    } else if (yaml is YamlList) {
-      for (var item in yaml) {
-        collectKeys(item, order);
+    }
+
+    // Остальные ключи по алфавиту
+    newOrder.addAll(extraKeys);
+
+    // Пересобираем карту
+    final newMap = LinkedHashMap<String, dynamic>();
+    for (var k in newOrder) {
+      newMap[k] = arb[k];
+      if (k != '@' && arb.containsKey('@$k')) {
+        // Описания для отдельных ключей
+        newMap['@$k'] = arb['@$k'];
+      }
+    }
+
+    arb
+      ..clear()
+      ..addAll(newMap);
+
+    // Рекурсивная сортировка вложенных структур
+    for (var k in newOrder) {
+      // Если k - не @, то сортируем вложенные структуры
+      if (k != '@') {
+        sortArbAccordingToYaml(
+          yaml is Map ? yaml[k] : findYamlForKeyInList(yaml, k),
+          arb[k],
+          isTopLevel: false,
+        );
       }
     }
   }
 
-  collectKeys(yamlContent, keyOrder);
+  // Обновляем ARB на основе YAML
+  processYaml(parsedYaml, arbContent);
 
-  // Добавляем порядок существующих ключей ARB
-  for (var key in arbContent.keys) {
-    if (!keyOrder.contains(key)) {
-      keyOrder.add(key);
-    }
-  }
+  // Сортируем ARB согласно YAML
+  sortArbAccordingToYaml(parsedYaml, arbContent, isTopLevel: true);
 
-  processYaml(
-      parsedYaml as LinkedHashMap<String, dynamic>, arbContent, keyOrder);
-
-  // Сортировка ключей в соответствии с YAML и сохранение существующих
-  LinkedHashMap<String, dynamic> sortKeys(
-      LinkedHashMap<String, dynamic> arb, List<String> order) {
-    final sorted = LinkedHashMap<String, dynamic>();
-
-    // @@locale всегда должен быть первым
-    if (arb.containsKey('@@locale')) {
-      sorted['@@locale'] = arb['@@locale'];
-    }
-
-    for (var key in order) {
-      if (arb.containsKey(key)) {
-        sorted[key] = arb[key];
-        if (arb.containsKey('@$key')) {
-          sorted['@$key'] = arb['@$key'];
-        }
-      }
-    }
-    return sorted;
-  }
-
-  final sortedArbContent = sortKeys(arbContent, keyOrder);
-
-  // Записываем результат в JSON
+  // Записываем результат
   final encoder = JsonEncoder.withIndent('  ');
-  final formattedContent = encoder.convert(sortedArbContent);
+  final formattedContent = encoder.convert(arbContent);
   arbFile.writeAsStringSync(formattedContent);
+
   print('ARB successfully augmented and sorted: $arbPath');
 }

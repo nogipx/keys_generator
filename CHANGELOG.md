@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.0
+- feat: add sorting arb according yaml
+
 ## 1.0.9
 - fix: remove generation and enable augmentation by default
 
