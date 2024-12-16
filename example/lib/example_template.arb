@@ -1,22 +1,21 @@
 {
   "@@locale": "",
-  "example.title": "",
-  "@example.title": {
+  "example_title": "",
+  "@example_title": {
     "description": "Top-level keys (example.title)"
   },
-  "example.testSnake.snakeStr1": "",
-  "@example.testSnake.snakeStr1": {
+  "example_testSnake_snakeStr1": "",
+  "@example_testSnake_snakeStr1": {
     "description": "Some value"
   },
-  "example.group.list.requiredDate": "",
-  "@example.group.list.requiredDate": {
+  "example_group_listRequiredDate": "",
+  "@example_group_listRequiredDate": {
     "description": "List-based dartdoc for particular key (example.group.list.required_date)"
   },
-  "example.group.list.requiredMoney": "",
-  "example.map.requiredMoney": "",
-  "example.map.requiredDate": "",
-  "@example.map.requiredDate": {
+  "example_group_listRequiredMoney": "",
+  "example_map_requiredDate": "",
+  "@example_map_requiredDate": {
     "description": "Map-based dartdoc for particular key (example.map.required_date)"
   },
-  "example.requiredMoney": ""
+  "example_map_requiredMoney": ""
 }

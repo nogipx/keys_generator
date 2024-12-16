@@ -5,15 +5,15 @@
 class ExampleNodocKeys {
   const ExampleNodocKeys._();
   static const ExampleNodocKeys i = ExampleNodocKeys._();
-  String get title => 'exampleNodoc.title';
+  String get title => 'exampleNodoc_title';
   _ExampleNodocGroupKeys get group => const _ExampleNodocGroupKeys._();
   _ExampleNodocMapKeys get map => const _ExampleNodocMapKeys._();
 }
 
 class _ExampleNodocMapKeys {
   const _ExampleNodocMapKeys._();
-  String get requiredDate => 'exampleNodoc.map.requiredDate';
-  String get requiredMoney => 'exampleNodoc.map.requiredMoney';
+  String get requiredDate => 'exampleNodoc_map_requiredDate';
+  String get requiredMoney => 'exampleNodoc_map_requiredMoney';
 }
 
 class _ExampleNodocGroupKeys {
@@ -23,7 +23,7 @@ class _ExampleNodocGroupKeys {
 
 class _ExampleNodocGroupListKeys {
   const _ExampleNodocGroupListKeys._();
-  String get requiredDate => 'exampleNodoc.group.list.requiredDate';
-  String get requiredMoney => 'exampleNodoc.group.list.requiredMoney';
+  String get requiredDate => 'exampleNodoc_group_list_requiredDate';
+  String get requiredMoney => 'exampleNodoc_group_list_requiredMoney';
 }
 

@@ -4,7 +4,12 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
-void augmentArbFromYaml(String yamlPath, String arbPath, String scope) {
+void augmentArbFromYaml(
+  String yamlPath,
+  String arbPath,
+  String scope, {
+  String hierarchySeparator = '_',
+}) {
   final yamlFile = File(yamlPath);
   if (!yamlFile.existsSync()) {
     throw Exception('YAML file not found: $yamlPath');
@@ -65,7 +70,7 @@ void augmentArbFromYaml(String yamlPath, String arbPath, String scope) {
     if (key.isEmpty) return key;
     final segments = key.split('.');
     final camelSegments = segments.map(toCamelCase).toList();
-    return camelSegments.join('.');
+    return camelSegments.join(hierarchySeparator);
   }
 
   /// Добавляем или обновляем ключ.
@@ -73,7 +78,7 @@ void augmentArbFromYaml(String yamlPath, String arbPath, String scope) {
   /// Если ключа нет, добавляем со значением "".
   /// Если есть описание - добавляем/обновляем @key.
   void ensureKeyAndDescription(String rawKey, String? newDesc) {
-    final finalKey = '$targetScope.${camelCaseKey(rawKey)}';
+    final finalKey = '$targetScope$hierarchySeparator${camelCaseKey(rawKey)}';
 
     // Если ключа нет - добавляем его с пустым значением.
     if (!newArb.containsKey(finalKey)) {
@@ -126,11 +131,13 @@ void augmentArbFromYaml(String yamlPath, String arbPath, String scope) {
             final parts = strItem.split(' // ');
             final keyPart = parts[0].trim();
             final descPart = parts[1].trim();
-            final finalKey = prefix.isEmpty ? keyPart : '$prefix.$keyPart';
+            final finalKey =
+                prefix.isEmpty ? keyPart : '$prefix$hierarchySeparator$keyPart';
             ensureKeyAndDescription(finalKey, descPart);
           } else {
             // Просто ключ
-            final finalKey = prefix.isEmpty ? strItem : '$prefix.$strItem';
+            final finalKey =
+                prefix.isEmpty ? strItem : '$prefix$hierarchySeparator$strItem';
             ensureKeyAndDescription(finalKey, null);
           }
         } else if (item is Map || item is List) {

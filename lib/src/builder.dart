@@ -19,6 +19,10 @@ Builder keysBuilder(BuilderOptions options) => KeysBuilder();
 
 /// A builder that generates Dart classes from YAML files with `.keys.yaml` or `.keys.yml` extensions.
 class KeysBuilder implements Builder {
+  final String hierarchySeparator;
+
+  KeysBuilder({this.hierarchySeparator = '_'});
+
   /// Specifies the input and output file extensions.
   @override
   final buildExtensions = const {
@@ -201,8 +205,9 @@ class KeysBuilder implements Builder {
       }
 
       final getterName = _toCamelCase(key);
-      final fullPath =
-          currentPath.isEmpty ? key : '$currentPath.${_toCamelCase(key)}';
+      final fullPath = currentPath.isEmpty
+          ? key
+          : '$currentPath$hierarchySeparator${_toCamelCase(key)}';
 
       // Generate a unique nested class name based on the path.
       final nestedClassName = '_${_capitalize(_toCamelCase(fullPath))}Keys';
@@ -292,7 +297,7 @@ class KeysBuilder implements Builder {
       }
 
       final getterName = _toCamelCase(name);
-      final getterValue = '$currentPath.$getterName';
+      final getterValue = '$currentPath$hierarchySeparator$getterName';
 
       fields.add(
         "${getterDoc.isNotEmpty ? '\n  /// $getterDoc\n' : ''}"

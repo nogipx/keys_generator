@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+- fix: underscore hierarchy
+
 ## 1.1.1
 - fix: valid arb file generation
 - fix: add scope to arb keys

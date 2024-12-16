@@ -1,9 +1,8 @@
 {
   "@@locale": "",
-  "exampleNodoc.title": "",
-  "exampleNodoc.group.list.requiredDate": "",
-  "exampleNodoc.group.list.requiredMoney": "",
-  "exampleNodoc.map.requiredDate": "",
-  "exampleNodoc.map.requiredMoney": "",
-  "exampleNodoc.requiredMoney": ""
+  "exampleNodoc_title": "",
+  "exampleNodoc_group_listRequiredDate": "",
+  "exampleNodoc_group_listRequiredMoney": "",
+  "exampleNodoc_map_requiredDate": "",
+  "exampleNodoc_map_requiredMoney": ""
 }
